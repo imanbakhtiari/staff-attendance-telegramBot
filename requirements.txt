@@ -1,0 +1,8 @@
+psycopg2-binary
+python-telegram-bot
+convertdate
+python-dotenv
+jdatetime
+pandas
+openpyxl
+pytz
