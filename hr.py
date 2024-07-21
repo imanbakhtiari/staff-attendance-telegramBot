@@ -5,10 +5,9 @@ import pytz
 from io import BytesIO
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackContext
 import psycopg2
-
 
 # Load environment variables from .env file
 load_dotenv()
@@ -30,10 +29,18 @@ def gregorian_to_jalali(date):
     jdate = jdatetime.date.fromgregorian(date=date)
     return f'{jdate.year}/{jdate.month:02}/{jdate.day:02}'
 
+def get_custom_keyboard():
+    keyboard = [
+        ['ﻭﺭﻭﺩ', 'ﺥﺭﻮﺟ'],
+        ['ﮒﺯﺍﺮﺷ', 'ﺭﺎﻬﻨﻣﺍ']
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
 async def start(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(
-        'به ربات حضور و غیاب خوش آمدید.\n'
-        'برای دریافت راهنما از /help استفاده کنید.'
+        'ﺐﻫ ﺮﺑﺎﺗ ﺢﺿﻭﺭ ﻭ ﻎﯾﺎﺑ ﺥﻮﺷ ﺂﻣﺪﯾﺩ.\n'
+        'ﺏﺭﺎﯾ ﺩﺮﯾﺎﻔﺗ ﺭﺎﻬﻨﻣﺍ ﺍﺯ /help ﺎﺴﺘﻓﺍﺪﻫ ﮏﻨﯾﺩ.',
+        reply_markup=get_custom_keyboard()
     )
 
 async def checkin(update: Update, context: CallbackContext) -> None:
@@ -43,7 +50,7 @@ async def checkin(update: Update, context: CallbackContext) -> None:
     date = now.date()
     jalali_date = gregorian_to_jalali(date)
     day = now.day
-    check_in_time = now.time().isoformat()
+    check_in_time = now.strftime('%H:%M')  # Format time without seconds
 
     try:
         conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST)
@@ -57,9 +64,9 @@ async def checkin(update: Update, context: CallbackContext) -> None:
         last_row = c.fetchone()
         print(f"Inserted data: {last_row}")
         conn.close()
-        await update.message.reply_text(f'شما در تاریخ {jalali_date} و ساعت {check_in_time} برای ثبت ورود به شرکت وارد شدید.')
+        await update.message.reply_text(f'ﺶﻣﺍ ﺩﺭ ﺕﺍﺮﯿﺧ {jalali_date} ﻭ ﺱﺎﻌﺗ {check_in_time} ﻭﺍﺭﺩ ﺵﺪﯾﺩ.')
     except psycopg2.Error as e:
-        await update.message.reply_text(f"خطا در پایگاه داده: {e}")
+        await update.message.reply_text(f"ﺦﻃﺍ ﺩﺭ ﭖﺎﯿﮔﺎﻫ ﺩﺍﺪﻫ: {e}")
 
 async def checkout(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
@@ -67,7 +74,7 @@ async def checkout(update: Update, context: CallbackContext) -> None:
     date = now.date()
     jalali_date = gregorian_to_jalali(date)
     day = now.day
-    check_out_time = now.time().isoformat()
+    check_out_time = now.strftime('%H:%M')  # Format time without seconds
 
     try:
         conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST)
@@ -79,9 +86,9 @@ async def checkout(update: Update, context: CallbackContext) -> None:
         ''', (check_out_time, user_id, date, day))
         conn.commit()
         conn.close()
-        await update.message.reply_text(f'شما در تاریخ {jalali_date} و ساعت {check_out_time} برای ثبت خروج از شرکت خارج شدید.')
+        await update.message.reply_text(f'ﺶﻣﺍ ﺩﺭ ﺕﺍﺮﯿﺧ {jalali_date} ﻭ ﺱﺎﻌﺗ {check_out_time} ﺥﺍﺮﺟ ﺵﺪﯾﺩ.')
     except psycopg2.Error as e:
-        await update.message.reply_text(f"خطا در پایگاه داده: {e}")
+        await update.message.reply_text(f"ﺦﻃﺍ ﺩﺭ ﭖﺎﯿﮔﺎﻫ ﺩﺍﺪﻫ: {e}")
 
 async def report(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
@@ -103,16 +110,16 @@ async def report(update: Update, context: CallbackContext) -> None:
         conn.close()
 
         if not records:
-            await update.message.reply_text('در این ماه رکوردی ثبت نشده است.')
+            await update.message.reply_text('ﺩﺭ ﺎﯿﻧ ﻡﺎﻫ ﺮﮐﻭﺭﺪﯾ ﺚﺒﺗ ﻦﺷﺪﻫ ﺎﺴﺗ.')
             return
 
         # Create an Excel file
         workbook = openpyxl.Workbook()
         sheet = workbook.active
-        sheet.title = 'گزارش حضور'
+        sheet.title = 'ﮒﺯﺍﺮﺷ ﺢﺿﻭﺭ'
 
         # Add headers
-        headers = ['تاریخ', 'روز', 'ورود', 'خروج', 'مدت زمان کار']
+        headers = ['ﺕﺍﺮﯿﺧ', 'ﺭﻭﺯ', 'ﻭﺭﻭﺩ', 'ﺥﺭﻮﺟ', 'ﻡﺪﺗ ﺰﻣﺎﻧ ﮎﺍﺭ']
         sheet.append(headers)
 
         total_hours = 0
@@ -120,36 +127,33 @@ async def report(update: Update, context: CallbackContext) -> None:
         for record in records:
             date, day, check_in, check_out = record
 
-            # Convert datetime and time to string, handling None values
-            check_in_str = check_in.isoformat() if check_in else 'ورود ثبت نشده'
-            check_out_str = check_out.isoformat() if check_out else 'خروج ثبت نشده'
+            # Format times without seconds
+            check_in_str = check_in.strftime('%H:%M') if check_in else 'ﻭﺭﻭﺩ ﺚﺒﺗ ﻦﺷﺪﻫ'
+            check_out_str = check_out.strftime('%H:%M') if check_out else 'ﺥﺭﻮﺟ ﺚﺒﺗ ﻦﺷﺪﻫ'
 
-            # Convert strings to datetime objects if not 'ثبت نشده'
-            try:
-                check_in_time = datetime.fromisoformat(check_in_str) if check_in_str != 'ورود ثبت نشده' else None
-            except ValueError:
-                check_in_time = None
-
-            try:
-                check_out_time = datetime.fromisoformat(check_out_str) if check_out_str != 'خروج ثبت نشده' else get_iran_time()
-            except ValueError:
-                check_out_time = get_iran_time()
-
-            work_duration = (check_out_time - check_in_time) if check_in_time else None
-            total_hours += work_duration.total_seconds() / 3600 if work_duration else 0
+            # Calculate work duration
+            if check_in and check_out:
+                check_in_time = datetime.combine(date, check_in)
+                check_out_time = datetime.combine(date, check_out)
+                work_duration = check_out_time - check_in_time
+                work_duration_hours = work_duration.total_seconds() / 3600
+                total_hours += work_duration_hours
+                work_duration_str = f'{work_duration_hours:.2f} ﺱﺎﻌﺗ'
+            else:
+                work_duration_str = 'ﻥﺩﺍﺭﺩ'
 
             row = [
                 gregorian_to_jalali(date),
                 day,
                 check_in_str,
                 check_out_str,
-                str(work_duration) if work_duration else 'ندارد'
+                work_duration_str
             ]
             sheet.append(row)
 
         # Add total hours to the end of the file
         sheet.append([])
-        sheet.append(['جمع ساعات کار', f'{total_hours:.2f}'])
+        sheet.append(['ﺞﻤﻋ ﺱﺎﻋﺎﺗ ﮎﺍﺭ', f'{total_hours:.2f} ﺱﺎﻌﺗ'])
 
         # Save the workbook to a BytesIO object
         file_stream = BytesIO()
@@ -160,32 +164,30 @@ async def report(update: Update, context: CallbackContext) -> None:
         await update.message.reply_document(document=file_stream, filename=f'attendance_report_{jalali_month}_{year}.xlsx')
 
     except psycopg2.Error as e:
-        await update.message.reply_text(f"خطا در پایگاه داده: {e}")
+        await update.message.reply_text(f"ﺦﻃﺍ ﺩﺭ ﭖﺎﯿﮔﺎﻫ ﺩﺍﺪﻫ: {e}")
     except Exception as e:
-        await update.message.reply_text(f"خطا: {e}")
+        await update.message.reply_text(f"ﺦﻃﺍ: {e}")
 
 async def help_command(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(
-        'دستورات موجود در ربات:\n'
-        '/checkin - برای ثبت ورود به شرکت.\n'
-        '/checkout - برای ثبت خروج از شرکت.\n'
-        '/report - برای دریافت گزارش ماهانه.\n'
-        '/help - برای دریافت راهنمای دستورات.'
+        'ﺪﺴﺗﻭﺭﺎﺗ:\n'
+        '/checkin - ﻭﺭﻭﺩ\n'
+        '/checkout - ﺥﺭﻮﺟ\n'
+        '/report - ﮒﺯﺍﺮﺷ\n'
+        '/help - ﺭﺎﻬﻨﻣﺍ'
     )
 
 def main():
     application = Application.builder().token(TOKEN).build()
 
-    # Register handlers
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(CommandHandler('checkin', checkin))
-    application.add_handler(CommandHandler('checkout', checkout))
-    application.add_handler(CommandHandler('report', report))
-    application.add_handler(CommandHandler('help', help_command))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("checkin", checkin))
+    application.add_handler(CommandHandler("checkout", checkout))
+    application.add_handler(CommandHandler("report", report))
+    application.add_handler(CommandHandler("help", help_command))
 
-    # Run the bot
     application.run_polling()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
 
