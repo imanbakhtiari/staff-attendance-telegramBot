@@ -31,3 +31,10 @@ Group=ubuntu
 WantedBy=multi-user.target
 ```
 
+```
+sudo systemctl damon-reload
+```
+```
+sudo systemctl start hr
+sudo systemctl enable hr
+```
